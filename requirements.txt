@@ -1,0 +1,30 @@
+# ---- Core web ----
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# ---- Config / models ----
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# ---- Agent orchestration ----
+langgraph==0.2.62
+langchain-core==0.3.29
+langchain-groq==0.2.3
+
+# ---- Ingestion tools ----
+youtube-transcript-api==1.2.4
+yt-dlp==2024.12.13
+
+# ---- Observability ----
+langfuse==2.57.0
+# langchain meta-package required by langfuse's LangChain callback integration
+langchain==0.3.14
+
+# ---- Storage ----
+aiosqlite==0.20.0
+
+# ---- Testing ----
+pytest==8.3.4
+pytest-asyncio==0.25.0
+httpx==0.28.1

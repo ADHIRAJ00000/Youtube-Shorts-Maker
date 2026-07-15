@@ -1,0 +1,19 @@
+1
+00:00:00,000 --> 00:00:04,000
+Welcome back to Alpha Zone where football meets AI.
+
+2
+00:00:04,000 --> 00:00:09,500
+Today I want to show you something wild about expected goals.
+
+3
+00:00:09,500 --> 00:00:15,000
+Most people think xG measures how good a shot was, but that's only half the story.
+
+4
+00:00:15,000 --> 00:00:21,000
+The model actually learns from thousands of historical shots to estimate probability.
+
+5
+00:00:21,000 --> 00:00:27,500
+And here is the part nobody talks about: it is terrible at rare events like long shots.

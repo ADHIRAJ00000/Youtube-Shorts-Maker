@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Content Repurposing Agent</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --panel-2: #1c2230; --border: #2a3038;
+    --text: #e6edf3; --muted: #8b949e; --accent: #6ea8fe; --accent-2: #3fb950;
+    --warn: #d29922; --danger: #f85149; --chip: #21262d; --radius: 12px;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f6f8fa; --panel: #ffffff; --panel-2: #f0f3f6; --border: #d0d7de;
+      --text: #1f2328; --muted: #656d76; --accent: #0969da; --accent-2: #1a7f37;
+      --warn: #9a6700; --danger: #cf222e; --chip: #eaeef2;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 32px 20px 80px; }
+  header h1 { font-size: 26px; margin: 0 0 4px; }
+  header p { color: var(--muted); margin: 0 0 24px; }
+  .accent { color: var(--accent); }
+
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; margin-bottom: 18px; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  input[type=text] {
+    flex: 1; min-width: 220px; padding: 12px 14px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--panel-2); color: var(--text); font-size: 15px;
+  }
+  input[type=text]:focus { outline: 2px solid var(--accent); border-color: transparent; }
+  button {
+    padding: 12px 20px; border: 0; border-radius: 10px; background: var(--accent);
+    color: #fff; font-weight: 600; font-size: 15px; cursor: pointer; transition: opacity .15s;
+  }
+  button:hover { opacity: .9; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button.ghost { background: var(--chip); color: var(--text); }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 10px; }
+  .hint a { color: var(--accent); }
+
+  /* progress */
+  .status { display: flex; align-items: center; gap: 12px; }
+  .spinner { width: 18px; height: 18px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .steps { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+  .step { font-size: 12px; padding: 4px 10px; border-radius: 20px; background: var(--chip); color: var(--muted); }
+  .step.active { background: var(--accent); color: #fff; }
+  .step.done { background: var(--accent-2); color: #fff; }
+
+  /* summary tiles */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .tile { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; text-align: center; }
+  .tile .n { font-size: 22px; font-weight: 700; }
+  .tile .l { font-size: 12px; color: var(--muted); }
+
+  h2 { font-size: 18px; margin: 26px 0 12px; }
+  h3 { font-size: 15px; margin: 0 0 8px; }
+  .quote { border-left: 3px solid var(--accent); padding: 6px 12px; margin: 8px 0; color: var(--muted); font-style: italic; background: var(--panel-2); border-radius: 0 8px 8px 0; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .clip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .score { font-weight: 700; color: var(--accent-2); }
+  .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .chip { background: var(--chip); border-radius: 6px; padding: 3px 9px; font-size: 13px; }
+  .hookline { margin: 3px 0; }
+  .hookline b { color: var(--accent); font-weight: 600; text-transform: capitalize; }
+  .copywrap { position: relative; }
+  .copy { font-size: 12px; padding: 4px 10px; border-radius: 6px; background: var(--chip); color: var(--text); font-weight: 600; }
+  .copy.ok { background: var(--accent-2); color: #fff; }
+  pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; white-space: pre-wrap; margin: 6px 0; font-size: 13px; }
+  .warn { color: var(--warn); font-size: 13px; }
+  .err { color: var(--danger); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; color: var(--muted); }
+  .foot { text-align: center; color: var(--muted); font-size: 13px; margin-top: 30px; }
+  .sechead { display: flex; justify-content: space-between; align-items: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Content Repurposing Agent <span class="accent">·</span></h1>
+    <p>One YouTube URL → ranked clips, hooks, titles &amp; SEO, via a self-critiquing agent team.</p>
+  </header>
+
+  <div class="card">
+    <div class="row">
+      <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
+      <button id="go">Generate</button>
+    </div>
+    <div class="hint">Needs a running server with a Groq key. Free key: <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a></div>
+  </div>
+
+  <div id="progress" class="card" style="display:none">
+    <div class="status">
+      <div class="spinner" id="spin"></div>
+      <div><b id="statusText">Starting…</b> <span class="meta" id="elapsed"></span></div>
+    </div>
+    <div class="steps" id="steps"></div>
+  </div>
+
+  <div id="results"></div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const $ = (s, el=document) => el.querySelector(s);
+const el = (tag, props={}, ...kids) => {
+  const n = document.createElement(tag);
+  Object.entries(props).forEach(([k,v]) => k==='class'?n.className=v:(k==='html'?n.innerHTML=v:n.setAttribute(k,v)));
+  kids.forEach(k => n.append(k));
+  return n;
+};
+const esc = s => (s??'').toString().replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+const STEPS = ['coordinator','clip scout','critic','select','hooks + titles','SEO','assemble'];
+let timer=null, started=0;
+
+function renderSteps(activeIdx){
+  const c = $('#steps'); c.innerHTML='';
+  STEPS.forEach((s,i)=>{
+    const cls = i<activeIdx ? 'step done' : (i===activeIdx ? 'step active' : 'step');
+    c.append(el('span',{class:cls},s));
+  });
+}
+
+function tick(){ $('#elapsed').textContent = `· ${((Date.now()-started)/1000).toFixed(0)}s`; }
+
+async function copy(text, btn){
+  try { await navigator.clipboard.writeText(text); const o=btn.textContent; btn.textContent='Copied!'; btn.classList.add('ok');
+    setTimeout(()=>{btn.textContent=o; btn.classList.remove('ok');},1200);
+  } catch(e){ btn.textContent='Copy failed'; }
+}
+function copyBtn(label, text){
+  const b = el('button',{class:'copy'}, label);
+  b.onclick = ()=>copy(text, b);
+  return b;
+}
+
+async function start(){
+  const url = $('#url').value.trim();
+  if(!url){ $('#url').focus(); return; }
+  $('#go').disabled = true; $('#results').innerHTML='';
+  $('#progress').style.display='block'; $('#statusText').textContent='Submitting…';
+  renderSteps(0); started=Date.now(); clearInterval(timer); timer=setInterval(tick,250);
+
+  let jobId;
+  try {
+    const r = await fetch('/process', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({video_url:url})});
+    const j = await r.json();
+    if(!r.ok){ throw new Error(j.detail || 'request failed'); }
+    jobId = j.job_id;
+    if(j.deduplicated){ $('#statusText').textContent='Found cached result…'; }
+  } catch(e){ return fail(e.message); }
+  poll(jobId);
+}
+
+let pollN=0;
+async function poll(jobId){
+  try {
+    const r = await fetch('/jobs/'+jobId);
+    const j = await r.json();
+    if(j.status==='done'){ clearInterval(timer); return done(j); }
+    if(j.status==='failed'){ clearInterval(timer); return fail(j.error||'job failed'); }
+    // fake-advance the step indicator while running
+    pollN++;
+    $('#statusText').textContent = j.status==='running' ? 'Working…' : 'Queued…';
+    renderSteps(Math.min(STEPS.length-1, 1 + Math.floor(pollN/2)));
+    setTimeout(()=>poll(jobId), 2500);
+  } catch(e){ setTimeout(()=>poll(jobId), 3000); }
+}
+
+function fail(msg){
+  $('#spin').style.display='none';
+  $('#statusText').innerHTML = '<span class="err">Failed</span>';
+  $('#steps').innerHTML='';
+  $('#results').innerHTML = `<div class="card err">⚠️ ${esc(msg)}</div>`;
+  $('#go').disabled=false;
+}
+
+function clipCard(c){
+  const card = el('div',{class:'card'});
+  const head = el('div',{class:'clip-head'});
+  head.append(el('h3',{}, `#${c.rank} · ${c.start}–${c.end}  (${Math.round(c.duration_s)}s)`));
+  head.append(el('span',{class:'score'}, `${c.total_score}/30`));
+  card.append(head);
+  card.append(el('div',{class:'quote'}, c.transcript_text));
+  card.append(el('div',{class:'meta'}, `Why: ${c.reason_chosen}`));
+
+  if(c.hooks?.length){
+    const h = el('div',{}); h.append(el('h3',{style:'margin-top:12px'},'Hooks'));
+    c.hooks.forEach(x=> h.append(el('div',{class:'hookline', html:`<b>${esc(x.style)}:</b> ${esc(x.text)}`})));
+    card.append(h);
+  }
+  if(c.titles?.length){
+    const t = el('div',{class:'tag-list'});
+    t.append(el('span',{class:'meta'},'Titles:'));
+    c.titles.forEach(x=> t.append(el('span',{class:'chip'}, x)));
+    card.append(t);
+  }
+  if(c.thumbnail_text?.length){
+    const t = el('div',{class:'tag-list'});
+    t.append(el('span',{class:'meta'},'Thumbnail:'));
+    c.thumbnail_text.forEach(x=> t.append(el('span',{class:'chip'}, x)));
+    card.append(t);
+  }
+  return card;
+}
+
+function seoBlock(seo){
+  const card = el('div',{class:'card'});
+  card.append(el('h2',{style:'margin-top:0'},'SEO — copy & paste'));
+
+  const mk = (label, text, pre=true) => {
+    const head = el('div',{class:'sechead'});
+    head.append(el('h3',{}, label));
+    head.append(copyBtn('Copy', text));
+    card.append(head);
+    card.append(pre ? el('pre',{}, text) : el('div',{}, text));
+  };
+  mk('Description', seo.description_md);
+  mk('Tags', (seo.tags||[]).join(', '));
+  mk('Hashtags', (seo.hashtags||[]).join(' '));
+  mk('Shorts caption', seo.shorts_caption);
+  mk('Reels caption', seo.reels_caption);
+  return card;
+}
+
+function done(job){
+  $('#spin').style.display='none'; $('#statusText').innerHTML='<span style="color:var(--accent-2)">Done</span>';
+  renderSteps(STEPS.length); $('#go').disabled=false;
+  const p = job.result; const res = $('#results'); res.innerHTML='';
+  if(!p){ res.innerHTML='<div class="card">No package produced.</div>'; return; }
+
+  const cr = p.critique||{}, cost=p.cost||{};
+  const tiles = el('div',{class:'card'});
+  const grid = el('div',{class:'tiles'});
+  const addTile=(n,l)=>{ const t=el('div',{class:'tile'}); t.append(el('div',{class:'n'},String(n))); t.append(el('div',{class:'l'},l)); grid.append(t); };
+  addTile(`${cr.approved??0}/${cr.proposed??0}`,'clips approved');
+  addTile(cr.rounds??0,'critique rounds');
+  addTile((cost.total_tokens??0).toLocaleString(),'tokens');
+  addTile('$'+(cost.total_cost_usd??0).toFixed(4),'cost');
+  tiles.append(grid);
+  if(p.warnings?.length) tiles.append(el('div',{class:'warn',style:'margin-top:10px'}, '⚠️ '+p.warnings.join('; ')));
+  res.append(tiles);
+
+  if(p.main_video_titles?.length){
+    const c = el('div',{class:'card'});
+    const head=el('div',{class:'sechead'}); head.append(el('h2',{style:'margin:0'},'Main video titles'));
+    head.append(copyBtn('Copy all', p.main_video_titles.join('\n'))); c.append(head);
+    p.main_video_titles.forEach(t=>{
+      const row=el('div',{class:'sechead',style:'padding:4px 0'});
+      row.append(el('span',{}, t)); row.append(el('span',{class:'meta'}, `${t.length} ch`));
+      c.append(row);
+    });
+    res.append(c);
+  }
+
+  res.append(el('h2',{},`Clips (${(p.approved_clips||[]).length})`));
+  (p.approved_clips||[]).forEach(c=> res.append(clipCard(c)));
+
+  if(p.seo) res.append(seoBlock(p.seo));
+
+  if(p.rejected_clips?.length){
+    const d = el('details',{class:'card'});
+    d.append(el('summary',{}, `Rejected / dropped clips (${p.rejected_clips.length})`));
+    p.rejected_clips.forEach(r=>{
+      d.append(el('div',{style:'margin-top:8px'}, ''));
+      d.append(el('div',{html:`<b>${esc(r.clip_id)}</b> <span class="meta">(${esc(r.start)}–${esc(r.end)})</span> — <span class="warn">${esc(r.verdict)}</span>: ${esc((r.reasons||[]).join('; '))}`}));
+    });
+    res.append(d);
+  }
+  loadStats();
+}
+
+async function loadStats(){
+  try {
+    const s = await (await fetch('/stats')).json();
+    if(s.videos_processed!=null){
+      const parts = [`${s.videos_processed} videos processed`];
+      if(s.approval_rate!=null) parts.push(`${Math.round(s.approval_rate*100)}% approval rate`);
+      if(s.avg_cost_per_video_usd!=null) parts.push(`~$${s.avg_cost_per_video_usd.toFixed(4)}/video`);
+      $('#foot').textContent = parts.join('  ·  ');
+    }
+  } catch(e){}
+}
+
+$('#go').onclick = start;
+$('#url').addEventListener('keydown', e=>{ if(e.key==='Enter') start(); });
+loadStats();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "_note": "PLACEHOLDER ground truth. Replace each fixture's golden_clips start_s/end_s with YOUR OWN manually-marked best clip ranges (you are the domain expert on your channel). Add your real Alpha Zone videos as fixtures via: python evals/make_fixtures.py <video_id ...>. A clip is a 'hit' if an agent clip overlaps >=50% of the golden range.",
+  "fixtures": [
+    {
+      "fixture": "aircAruvnKk",
+      "video_id": "aircAruvnKk",
+      "title": "But what is a neural network? (3Blue1Brown)",
+      "golden_clips": [
+        {"start_s": 65, "end_s": 123, "label": "why machine learning matters (PLACEHOLDER)"},
+        {"start_s": 168, "end_s": 214, "label": "what a neuron actually is (PLACEHOLDER)"},
+        {"start_s": 582, "end_s": 632, "label": "how weights work (PLACEHOLDER)"},
+        {"start_s": 728, "end_s": 777, "label": "connections between layers (PLACEHOLDER)"}
+      ]
+    },
+    {
+      "fixture": "dQw4w9WgXcQ",
+      "video_id": "dQw4w9WgXcQ",
+      "title": "Never Gonna Give You Up (music video — weak eval fixture)",
+      "golden_clips": [
+        {"start_s": 43, "end_s": 73, "label": "chorus (PLACEHOLDER)"},
+        {"start_s": 130, "end_s": 160, "label": "second verse (PLACEHOLDER)"}
+      ]
+    }
+  ]
+}
