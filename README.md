@@ -4,6 +4,11 @@
 
 Built with **LangGraph + FastAPI + Groq**, instrumented with **Langfuse** tracing and a persisted job store. Used in production for the *Alpha Zone* YouTube channel (football + AI).
 
+> ### ⚠️ Please read: about the live demo
+> The web UI is **fully working**. However, YouTube blocks requests coming from cloud/hosted servers, so on the **live (hosted) site the "paste a YouTube URL" feature will not work** — you can't generate clips from a URL there.
+>
+> **To generate clips from a YouTube URL, run this project on your own computer (local server), where it works perfectly.** On the live site, you can still use the **"Upload transcript"** button, which works everywhere. See [Quickstart](#quickstart) to run it locally.
+
 ---
 
 ## Why this is a real agent, not a fancy script
