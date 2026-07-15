@@ -51,6 +51,21 @@ def test_extract_video_id_invalid() -> None:
         extract_video_id("https://example.com/not-a-video")
 
 
+def test_proxy_config_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.ingestion.transcript import _build_proxy_config
+
+    # No proxy env -> None.
+    for k in ("YOUTUBE_PROXY_USERNAME", "YOUTUBE_PROXY_PASSWORD",
+              "YOUTUBE_HTTP_PROXY", "YOUTUBE_HTTPS_PROXY"):
+        monkeypatch.delenv(k, raising=False)
+    assert _build_proxy_config() is None
+
+    # Webshare creds -> a proxy config object.
+    monkeypatch.setenv("YOUTUBE_PROXY_USERNAME", "user")
+    monkeypatch.setenv("YOUTUBE_PROXY_PASSWORD", "pass")
+    assert _build_proxy_config() is not None
+
+
 # --------------------------------------------------------------------------- #
 # File loading
 # --------------------------------------------------------------------------- #

@@ -93,7 +93,11 @@
       <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=…" autocomplete="off" />
       <button id="go">Generate</button>
     </div>
-    <div class="hint">Needs a running server with a Groq key. Free key: <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com/keys</a></div>
+    <div class="row" style="margin-top:10px">
+      <input id="file" type="file" accept=".srt,.txt,.json" style="flex:1; padding:9px" />
+      <button id="goFile" class="ghost">Upload transcript</button>
+    </div>
+    <div class="hint">Needs a Groq key (<a href="https://console.groq.com/keys" target="_blank" rel="noopener">free</a>). On a hosted server YouTube may block URL fetching — <b>uploading a transcript always works</b>.</div>
   </div>
 
   <div id="progress" class="card" style="display:none">
@@ -143,13 +147,19 @@ function copyBtn(label, text){
   return b;
 }
 
+function setBusy(b){ $('#go').disabled=b; $('#goFile').disabled=b; }
+
+function beginProgress(label){
+  $('#results').innerHTML='';
+  $('#spin').style.display='';
+  $('#progress').style.display='block'; $('#statusText').textContent=label;
+  renderSteps(0); started=Date.now(); clearInterval(timer); timer=setInterval(tick,250);
+}
+
 async function start(){
   const url = $('#url').value.trim();
   if(!url){ $('#url').focus(); return; }
-  $('#go').disabled = true; $('#results').innerHTML='';
-  $('#progress').style.display='block'; $('#statusText').textContent='Submitting…';
-  renderSteps(0); started=Date.now(); clearInterval(timer); timer=setInterval(tick,250);
-
+  setBusy(true); beginProgress('Submitting…');
   let jobId;
   try {
     const r = await fetch('/process', {method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({video_url:url})});
@@ -157,6 +167,21 @@ async function start(){
     if(!r.ok){ throw new Error(j.detail || 'request failed'); }
     jobId = j.job_id;
     if(j.deduplicated){ $('#statusText').textContent='Found cached result…'; }
+  } catch(e){ return fail(e.message); }
+  poll(jobId);
+}
+
+async function startFile(){
+  const f = $('#file').files[0];
+  if(!f){ $('#file').focus(); return; }
+  setBusy(true); beginProgress('Uploading transcript…');
+  let jobId;
+  try {
+    const fd = new FormData(); fd.append('file', f);
+    const r = await fetch('/process', {method:'POST', body: fd});
+    const j = await r.json();
+    if(!r.ok){ throw new Error(j.detail || 'request failed'); }
+    jobId = j.job_id;
   } catch(e){ return fail(e.message); }
   poll(jobId);
 }
@@ -181,7 +206,7 @@ function fail(msg){
   $('#statusText').innerHTML = '<span class="err">Failed</span>';
   $('#steps').innerHTML='';
   $('#results').innerHTML = `<div class="card err">⚠️ ${esc(msg)}</div>`;
-  $('#go').disabled=false;
+  setBusy(false);
 }
 
 function clipCard(c){
@@ -234,7 +259,7 @@ function seoBlock(seo){
 
 function done(job){
   $('#spin').style.display='none'; $('#statusText').innerHTML='<span style="color:var(--accent-2)">Done</span>';
-  renderSteps(STEPS.length); $('#go').disabled=false;
+  renderSteps(STEPS.length); setBusy(false);
   const p = job.result; const res = $('#results'); res.innerHTML='';
   if(!p){ res.innerHTML='<div class="card">No package produced.</div>'; return; }
 
@@ -292,6 +317,7 @@ async function loadStats(){
 }
 
 $('#go').onclick = start;
+$('#goFile').onclick = startFile;
 $('#url').addEventListener('keydown', e=>{ if(e.key==='Enter') start(); });
 loadStats();
 </script>

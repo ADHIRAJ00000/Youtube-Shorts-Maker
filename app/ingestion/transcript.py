@@ -35,6 +35,31 @@ class TranscriptError(Exception):
     """
 
 
+def _build_proxy_config():
+    """Build a youtube-transcript-api proxy config from env vars, or None.
+
+    YouTube blocks datacenter IPs, so hosted deployments usually need a
+    residential proxy. Supports Webshare (recommended) or a generic HTTP proxy.
+    """
+    import os
+
+    user = os.environ.get("YOUTUBE_PROXY_USERNAME", "").strip()
+    pw = os.environ.get("YOUTUBE_PROXY_PASSWORD", "").strip()
+    if user and pw:
+        from youtube_transcript_api.proxies import WebshareProxyConfig  # type: ignore
+
+        return WebshareProxyConfig(proxy_username=user, proxy_password=pw)
+
+    http = os.environ.get("YOUTUBE_HTTP_PROXY", "").strip()
+    https = os.environ.get("YOUTUBE_HTTPS_PROXY", "").strip() or http
+    if http or https:
+        from youtube_transcript_api.proxies import GenericProxyConfig  # type: ignore
+
+        return GenericProxyConfig(http_url=http or https, https_url=https or http)
+
+    return None
+
+
 class Segment(BaseModel):
     """A single timestamped line of transcript."""
 
@@ -130,12 +155,15 @@ def fetch_transcript(
     )
     from youtube_transcript_api._errors import (  # type: ignore
         CouldNotRetrieveTranscript,
+        IpBlocked,
+        RequestBlocked,
     )
 
     video_id = extract_video_id(video_url)
 
     try:
-        api = YouTubeTranscriptApi()
+        proxy_config = _build_proxy_config()
+        api = YouTubeTranscriptApi(proxy_config=proxy_config) if proxy_config else YouTubeTranscriptApi()
         transcript_list = api.list(video_id)
         available = [t.language_code for t in transcript_list]
 
@@ -165,6 +193,14 @@ def fetch_transcript(
             )
 
         raw = chosen.fetch()
+    except (IpBlocked, RequestBlocked) as exc:
+        raise TranscriptError(
+            "YouTube blocked this request. This is common on cloud/hosted servers "
+            "(Render, AWS, etc.) whose IPs YouTube throttles. Options: (1) upload "
+            "the transcript file (.srt/.txt/.json) instead — that path needs no "
+            "YouTube access; or (2) set a residential proxy via the "
+            "YOUTUBE_PROXY_USERNAME/YOUTUBE_PROXY_PASSWORD env vars."
+        ) from exc
     except (TranscriptsDisabled,) as exc:
         raise TranscriptError(
             f"Transcripts are disabled for video {video_id}."

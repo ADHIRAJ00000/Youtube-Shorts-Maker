@@ -156,6 +156,24 @@ LLM-as-judge (avg 1-10): hook truthfulness 8.0 · title truthfulness 9.0 · titl
 | `GET`  | `/jobs/{id}` | status + full package when done |
 | `GET`  | `/stats` | videos processed, approval/rejection rate, avg cost/video |
 
+## Deploying (and the YouTube-blocking caveat)
+
+The Dockerfile binds to `$PORT`, so it deploys as-is to Render, Fly.io, Cloud
+Run, or Hugging Face Spaces — set `LLM_API_KEY` (and optional Langfuse keys) as
+environment variables in the host dashboard.
+
+**One production gotcha:** YouTube throttles/blocks datacenter IPs, so fetching a
+transcript *by URL* often fails on hosted servers (you'll get a clear
+`IpBlocked` message). Two robust paths handle this:
+
+1. **Upload a transcript file** (`.srt`/`.txt`/`.json`) — needs no YouTube access
+   at all, so it works on any server. This is the default reliable path in the UI.
+2. **Set a residential proxy** — the fetcher reads `YOUTUBE_PROXY_USERNAME` /
+   `YOUTUBE_PROXY_PASSWORD` (Webshare) or `YOUTUBE_HTTP_PROXY`, so URL fetching
+   works from the cloud too.
+
+Running locally (a residential IP) needs neither.
+
 ## Tech stack
 
 Python 3.12 · LangGraph · LangChain · Groq (`llama-3.3-70b-versatile`, free tier) · FastAPI · Pydantic v2 · youtube-transcript-api · yt-dlp · Langfuse · SQLite · pytest · Docker
