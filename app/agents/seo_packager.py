@@ -55,7 +55,9 @@ def seo_packager_node(state: ContentState) -> dict:
         return {"node_trace": ["seo_packager"]}
 
     titles = state.get("titles")
+
     main_title = ""
+    
     if titles and titles.main_video_titles:
         main_title = titles.main_video_titles[0]
 

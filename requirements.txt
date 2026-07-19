@@ -14,7 +14,11 @@ langchain-groq==0.2.3
 
 # ---- Ingestion tools ----
 youtube-transcript-api==1.2.4
-yt-dlp==2024.12.13
+# Keep current: YouTube changes its player often and stale yt-dlp versions
+# silently return zero formats, breaking audio download and the heatmap.
+yt-dlp==2026.7.4
+# Whisper audio transcription for videos with captions disabled.
+groq==0.37.1
 
 # ---- Observability ----
 langfuse==2.57.0

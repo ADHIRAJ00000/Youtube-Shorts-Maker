@@ -6,27 +6,51 @@ resulting transcript + content map are handed to the graph.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any, Optional
 
 from app.agents.graph import build_graph
 from app.agents.state import ContentState
 from app.config import get_settings
+from app.ingestion.audio import transcribe_from_audio, whisper_available
 from app.ingestion.chunker import build_content_map
-from app.ingestion.transcript import load_transcript
+from app.ingestion.heatmap import fetch_heatmap
+from app.ingestion.transcript import TranscriptError, load_transcript
 from app.observability import tracing
+from app.observability.logging_setup import get_logger
+
+log = get_logger("app.pipeline")
 
 
 def build_initial_state(source: str, video_url: Optional[str] = None) -> ContentState:
     """Ingest a URL/file into an initial graph state. Raises TranscriptError."""
-    transcript = load_transcript(source)
+    is_url = not Path(source).exists()
+    errors: list[str] = []
+
+    try:
+        transcript = load_transcript(source)
+    except TranscriptError:
+        # No captions. For a URL we can still transcribe the audio ourselves;
+        # for an uploaded file there is nothing else to try.
+        if not (is_url and whisper_available()):
+            raise
+        log.info("ingest.captions_missing_falling_back_to_whisper")
+        transcript = transcribe_from_audio(source)
+        errors.append("No captions available; transcribed the audio with Whisper.")
+
     content_map = build_content_map(transcript)
+
+    # Audience retention is optional enrichment — never fatal, only for URLs.
+    heatmap = fetch_heatmap(source) if is_url else None
+
     return {
         "video_url": video_url if video_url is not None else source,
         "transcript": transcript,
         "content_map": content_map,
+        "heatmap": heatmap,
         "content_type": "unknown",
         "node_trace": [],
-        "errors": [],
+        "errors": errors,
         "token_usage": {},
     }
 

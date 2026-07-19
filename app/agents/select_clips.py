@@ -31,13 +31,13 @@ def select_clips_node(state: ContentState) -> dict:
 
     errors: list[str] = []
     if not approved and candidates:
-        approved = sorted(candidates, key=lambda c: c.total_score, reverse=True)[:_FALLBACK_N]
+        approved = sorted(candidates, key=lambda c: c.ranked_score, reverse=True)[:_FALLBACK_N]
         errors.append(
             f"All clips rejected after critique; fell back to top-{_FALLBACK_N} by score."
         )
         log.warning("select_clips.fallback", extra={"extra_fields": {"kept": len(approved)}})
 
-    ranked = sorted(approved, key=lambda c: c.total_score, reverse=True)
+    ranked = sorted(approved, key=lambda c: c.ranked_score, reverse=True)
     approved_clips = [
         ApprovedClip(
             candidate=c,

@@ -14,6 +14,7 @@ from typing import Annotated, Literal, Optional, TypedDict
 from pydantic import BaseModel, Field, field_validator
 
 from app.ingestion.chunker import ContentMap
+from app.ingestion.heatmap import Heatmap
 from app.ingestion.transcript import Transcript
 from app.tools.video_tools import VideoMeta
 
@@ -44,6 +45,14 @@ def _coerce_str_list(v):
     return out
 Verdict = Literal["approve", "reject", "revise"]
 HookStyle = Literal["curiosity", "bold_claim", "question"]
+ClipOrigin = Literal["llm", "heatmap"]
+
+# Retention ranking tuning. A lift of 1.0 is average; `_RETENTION_LIFT_SCALE`
+# is the lift above average that earns the full bonus (1.5 = replayed 50% more
+# than typical). The bonus is capped so view data nudges the LLM's ranking
+# rather than overriding it.
+_MAX_RETENTION_BONUS = 4.0
+_RETENTION_LIFT_SCALE = 0.5
 
 
 # --------------------------------------------------------------------------- #
@@ -66,11 +75,33 @@ class ClipCandidate(BaseModel):
     transcript_text: str
     reason_chosen: str
     scores: ClipScores
+    # Where the clip came from: the LLM reading the transcript, or a peak in
+    # YouTube's 'most replayed' curve.
+    origin: ClipOrigin = "llm"
+    # Mean retention of this window relative to the video average (1.0 =
+    # average, 1.4 = replayed 40% more than typical). None when no heatmap.
+    retention_lift: Optional[float] = Field(default=None, ge=0)
 
     @property
     def total_score(self) -> int:
+        """The LLM's own quality score (3-30), independent of view data."""
         s = self.scores
         return s.hook_potential + s.completeness + s.shareability
+
+    @property
+    def ranked_score(self) -> float:
+        """Quality score adjusted by audience retention — used for ranking.
+
+        A clip on a strong peak gains up to `_MAX_RETENTION_BONUS` points; one
+        in a dead zone loses up to the same. Videos with no heatmap rank on the
+        LLM score alone, so behaviour is unchanged when the signal is missing.
+        """
+        if self.retention_lift is None:
+            return float(self.total_score)
+        # lift 1.0 (average) -> 0 bonus; clamped so one signal can't dominate.
+        delta = (self.retention_lift - 1.0) / _RETENTION_LIFT_SCALE
+        bonus = max(-_MAX_RETENTION_BONUS, min(_MAX_RETENTION_BONUS, delta * _MAX_RETENTION_BONUS))
+        return round(self.total_score + bonus, 3)
 
     @property
     def duration_s(self) -> float:
@@ -205,6 +236,8 @@ class ContentState(TypedDict, total=False):
     transcript: Optional[Transcript]
     content_map: Optional[ContentMap]
     content_type: ContentType
+    # YouTube 'most replayed' curve, when the video exposes one.
+    heatmap: Optional[Heatmap]
 
     # ---- clip pipeline ----
     clip_candidates: list[ClipCandidate]

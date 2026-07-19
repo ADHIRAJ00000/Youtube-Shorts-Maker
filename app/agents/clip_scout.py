@@ -177,6 +177,101 @@ def _score(pick: ClipPick) -> int:
 
 
 # --------------------------------------------------------------------------- #
+# Audience-retention fusion
+# --------------------------------------------------------------------------- #
+# A heatmap peak is considered "already found" if an LLM clip covers at least
+# this fraction of it — no point emitting a near-duplicate.
+_PEAK_COVERED_FRACTION = 0.5
+
+
+def _text_between(transcript, start_s: float, end_s: float) -> str:
+    """Transcript text overlapping a time window, joined in order."""
+    return " ".join(
+        seg.text
+        for seg in transcript.segments
+        if seg.end_s > start_s and seg.start_s < end_s and seg.text
+    ).strip()
+
+
+def _lift_to_scores(lift: float) -> ClipScores:
+    """Derive 1-10 scores for a clip discovered purely from view data.
+
+    A peak is direct evidence of hook potential and shareability — viewers
+    rewatched it. It says nothing about whether the moment is self-contained,
+    so completeness stays deliberately middling and lets the critic judge.
+    """
+    # lift 1.15 (the peak threshold) -> 6, lift 1.6+ -> 10.
+    scaled = int(round(6 + (lift - 1.15) * 9))
+    strong = max(1, min(10, scaled))
+    return ClipScores(hook_potential=strong, completeness=5, shareability=strong)
+
+
+def _fuse_heatmap(candidates: list[ClipCandidate], heatmap, transcript, max_clips: int):
+    """Annotate candidates with retention and add clips for unfound peaks.
+
+    Two distinct jobs:
+      1. Every LLM clip gets its `retention_lift`, which feeds `ranked_score`
+         so moments the audience actually rewatched rank higher.
+      2. Peaks no LLM clip covers become candidates in their own right. This is
+         what surfaces a great moment the transcript reads flat — and on a
+         Whisper-transcribed video it's often the strongest signal available.
+    """
+    if heatmap is None or not heatmap.buckets:
+        return candidates
+
+    for c in candidates:
+        c.retention_lift = heatmap.lift_for(c.start_s, c.end_s)
+
+    peaks = heatmap.peaks(max_peaks=max_clips)
+    added: list[ClipCandidate] = []
+    next_id = len(candidates) + 1
+
+    for peak in peaks:
+        covered = any(
+            (min(peak.end_s, c.end_s) - max(peak.start_s, c.start_s))
+            >= _PEAK_COVERED_FRACTION * peak.duration_s
+            for c in candidates
+        )
+        if covered:
+            continue
+
+        text = _text_between(transcript, peak.start_s, peak.end_s)
+        if not text:
+            # No words in this window (music, action, silence). We could still
+            # cut it, but every downstream agent writes from transcript text,
+            # so a textless clip would only invite hallucinated hooks.
+            log.info(
+                "clip_scout.peak_skipped_no_text",
+                extra={"extra_fields": {"start_s": peak.start_s, "lift": peak.lift}},
+            )
+            continue
+
+        added.append(
+            ClipCandidate(
+                clip_id=f"clip_{next_id}",
+                start_s=peak.start_s,
+                end_s=peak.end_s,
+                transcript_text=text,
+                reason_chosen=(
+                    f"Most-replayed moment: viewers rewatched this "
+                    f"{peak.lift:.1f}x more than the video average."
+                ),
+                scores=_lift_to_scores(peak.lift),
+                origin="heatmap",
+                retention_lift=peak.lift,
+            )
+        )
+        next_id += 1
+
+    if added:
+        log.info(
+            "clip_scout.heatmap_clips_added",
+            extra={"extra_fields": {"added": len(added), "peaks_found": len(peaks)}},
+        )
+    return candidates + added
+
+
+# --------------------------------------------------------------------------- #
 # Node
 # --------------------------------------------------------------------------- #
 def clip_scout_node(state: ContentState) -> dict:
@@ -243,8 +338,16 @@ def clip_scout_node(state: ContentState) -> dict:
             )
         )
 
+    candidates = _fuse_heatmap(
+        candidates, state.get("heatmap"), transcript, max_clips
+    )
+
     log.info("clip_scout.done",
-             extra={"extra_fields": {"candidates": len(candidates), "round": round_}})
+             extra={"extra_fields": {
+                 "candidates": len(candidates),
+                 "from_heatmap": sum(1 for c in candidates if c.origin == "heatmap"),
+                 "round": round_,
+             }})
     return {
         "clip_candidates": candidates,
         "token_usage": {f"clip_scout.r{round_}": usage},

@@ -58,6 +58,9 @@ def build_package(state: ContentState) -> dict[str, Any]:
             "end": seconds_to_hhmmss(c.end_s),
             "duration_s": c.duration_s,
             "total_score": c.total_score,
+            "ranked_score": c.ranked_score,
+            "origin": c.origin,
+            "retention_lift": c.retention_lift,
             "scores": c.scores.model_dump(),
             "reason_chosen": c.reason_chosen,
             "transcript_text": c.transcript_text,
@@ -135,7 +138,12 @@ def render_markdown(pkg: dict[str, Any]) -> str:
     # Per-clip sections
     lines.append("\n## Clips\n")
     for c in pkg["approved_clips"]:
-        lines.append(f"### #{c['rank']} · {c['start']}–{c['end']} ({c['duration_s']:.0f}s) — score {c['total_score']}/30\n")
+        header = f"### #{c['rank']} · {c['start']}–{c['end']} ({c['duration_s']:.0f}s) — score {c['total_score']}/30"
+        if c.get("retention_lift") is not None:
+            header += f" · {c['retention_lift']:.2f}× replays"
+        if c.get("origin") == "heatmap":
+            header += " · 🔥 most replayed"
+        lines.append(header + "\n")
         lines.append(f"> {c['transcript_text']}\n")
         lines.append(f"*Why:* {c['reason_chosen']}\n")
         if c["hooks"]:
